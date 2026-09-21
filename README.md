@@ -59,7 +59,51 @@ This will install the dependenices needed to build the app and run the same comm
 
 ### API
 
-Our api for tracking habits will be built in Express and data will be stored in a SQLite database created in the `api/db` folder.
+Our api for tracking habits will be built in Express. The API is **JSON-only** — all routes and error responses return JSON (the default Jade views and static styling were removed).
+
+Data will be stored in a SQLite database created in the `api/db` folder (not yet implemented — routes currently use a test-user fixture).
+
+#### Running the API
+
+```
+cd api
+npm install
+npm start
+```
+
+The server starts on `http://localhost:3000`. JWT secrets are loaded from `api/.env` (copy `api/.env.example` and set `JWT_SECRET` if setting up fresh).
+
+#### Endpoints
+
+| Method | Path        | Auth   | Description                                     |
+|--------|-------------|--------|-------------------------------------------------|
+| GET    | `/`         | none   | JSON placeholder                                |
+| GET    | `/users`    | none   | JSON placeholder                                |
+| GET    | `/health`   | none   | Healthcheck — returns `{ status, uptime, timestamp }` |
+| POST   | `/login`    | none   | Login with `{ email, password }` → returns JWT + user |
+| GET    | `/profile`  | Bearer | Current logged-in user (password-free)          |
+| POST   | `/logout`   | Bearer | Revokes the current token                       |
+
+Example login:
+
+```
+curl -X POST http://localhost:3000/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"jane.doe@example.com","password":"hunter2"}'
+```
+
+Use the returned token on protected routes: `Authorization: Bearer <token>`.
+
+#### Current state
+
+- ✅ JSON-only API with 404/error handling
+- ✅ Healthcheck endpoint
+- ✅ JWT auth (HS256, 24h expiry) with login, profile, and logout (token revocation)
+- ⏳ SQLite database in `api/db` (planned)
+- ⏳ Password hashing with bcrypt (currently plain-text against a test fixture)
+- ⏳ Habit CRUD endpoints
+
+See `CHANGELOG.md` for a detailed list of changes and `prompts/` for dated session logs.
 
 ---
 
