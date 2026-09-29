@@ -1,8 +1,9 @@
-var express = require('express');
-var router = express.Router();
+import express from 'express';
+
+const router = express.Router();
 
 /* GET healthcheck. */
-router.get('/', function(req, res, next) {
+router.get('/', (_req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
@@ -10,4 +11,4 @@ router.get('/', function(req, res, next) {
   });
 });
 
-module.exports = router;
+export default router;

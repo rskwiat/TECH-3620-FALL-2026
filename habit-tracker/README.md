@@ -25,6 +25,38 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Authentication
+
+The app ships with an email/password auth flow backed by the Express API in [`../api`](../api):
+
+| Route             | Access            | Screen                                        |
+| ----------------- | ----------------- | --------------------------------------------- |
+| `/login`          | signed out only   | `src/app/login.tsx`                           |
+| `/signup`         | signed out only   | `src/app/signup.tsx`                          |
+| `/` (Home)        | signed in only    | `src/app/(app)/index.tsx`                     |
+| `/explore`        | signed in only    | `src/app/(app)/explore.tsx`                   |
+
+- `src/app/_layout.tsx` wraps the app in a `SessionProvider` and uses
+  [`Stack.Protected`](https://docs.expo.dev/router/advanced/protected/) guards:
+  unauthenticated visitors are redirected to **login**, and authenticated ones to the
+  **(app)** tab group. Signing in or out flips the guard, which moves you automatically.
+- `src/ctx.tsx` holds the session (JWT + user). It is persisted with `expo-secure-store`
+  on device and `localStorage` on web, and a restored token is re-checked against
+  `GET /profile` once on launch.
+- `src/api.ts` is the fetch client for `POST /login`, `POST /signup`, `POST /logout` and
+  `GET /profile`.
+
+To run the flow end to end:
+
+```bash
+cd ../api && npm install && npm run db:seed && npm run dev   # API on port 3000
+npx expo start                                                # app
+```
+
+The API base URL comes from `EXPO_PUBLIC_API_URL` in [`.env`](.env) (defaults to
+`http://localhost:3000`; use `http://10.0.2.2:3000` for the Android emulator or your LAN
+IP for a physical device). Seeded demo login: `jane.doe@example.com` / `hunter2`.
+
 ## Get a fresh project
 
 When you're ready, run:

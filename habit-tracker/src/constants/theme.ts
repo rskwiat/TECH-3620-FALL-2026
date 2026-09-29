@@ -14,6 +14,10 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    /** Accent used for primary actions (buttons, links, focus). */
+    primary: '#208AEF',
+    /** Error text for form and API messages. */
+    danger: '#C73737',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +25,8 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    primary: '#208AEF',
+    danger: '#FF7B72',
   },
 } as const;
 

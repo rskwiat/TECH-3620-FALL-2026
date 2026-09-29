@@ -3,24 +3,22 @@
 // NOTE: this only lasts for the current server process — a persistent store
 // (e.g. SQLite) is needed once the database lands or we scale past 1 instance.
 
-var revokedTokens = new Map(); // jti -> exp (seconds)
+const revokedTokens = new Map<string, number>(); // jti -> exp (seconds)
 
-function prune() {
-  var now = Math.floor(Date.now() / 1000);
-  for (var [jti, exp] of revokedTokens) {
+function prune(): void {
+  const now = Math.floor(Date.now() / 1000);
+  for (const [jti, exp] of revokedTokens) {
     if (exp < now) {
       revokedTokens.delete(jti);
     }
   }
 }
 
-function revoke(jti, exp) {
+export function revoke(jti: string, exp?: number): void {
   prune();
-  revokedTokens.set(jti, exp || Math.floor(Date.now() / 1000));
+  revokedTokens.set(jti, exp ?? Math.floor(Date.now() / 1000));
 }
 
-function isRevoked(jti) {
+export function isRevoked(jti: string): boolean {
   return revokedTokens.has(jti);
 }
-
-module.exports = { revoke: revoke, isRevoked: isRevoked };
