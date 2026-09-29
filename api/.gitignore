@@ -16,3 +16,7 @@ yarn-error.*
 
 # generated folders
 /dist
+/src/prisma/generated
+
+# sqlite database files
+/db
