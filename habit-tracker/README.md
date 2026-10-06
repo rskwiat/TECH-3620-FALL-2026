@@ -33,8 +33,14 @@ The app ships with an email/password auth flow backed by the Express API in [`..
 | ----------------- | ----------------- | --------------------------------------------- |
 | `/login`          | signed out only   | `src/app/login.tsx`                           |
 | `/signup`         | signed out only   | `src/app/signup.tsx`                          |
-| `/` (Home)        | signed in only    | `src/app/(app)/index.tsx`                     |
-| `/explore`        | signed in only    | `src/app/(app)/explore.tsx`                   |
+| `/` (Today)       | signed in only    | `src/app/(app)/index.tsx`                     |
+| `/weekly`         | signed in only    | `src/app/(app)/weekly.tsx`                    |
+| `/stats`          | signed in only    | `src/app/(app)/stats.tsx`                     |
+| `/settings`       | signed in only    | `src/app/(app)/settings.tsx`                  |
+
+The four authenticated tabs are **Today**, **Weekly**, **Stats**, and **Settings**. Each is a
+templated page built on `src/components/page-template.tsx`, so every screen shows a default
+title matching its tab name. Account details and **sign out** live on the Settings tab.
 
 - `src/app/_layout.tsx` wraps the app in a `SessionProvider` and uses
   [`Stack.Protected`](https://docs.expo.dev/router/advanced/protected/) guards:
