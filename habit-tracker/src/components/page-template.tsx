@@ -6,6 +6,7 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 type PageTemplateProps = {
   /** Page title — keep it identical to the tab's label. */
@@ -23,9 +24,14 @@ type PageTemplateProps = {
  * card describing what will live here.
  */
 export function PageTemplate({ title, subtitle, placeholder, children }: PageTemplateProps) {
+  const theme = useTheme();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+      edges={['top', 'left', 'right']}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webContent]}>
         <ThemedView style={styles.inner}>
           <ThemedView style={styles.header}>
@@ -52,8 +58,11 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'center',
     paddingBottom: BottomTabInset + Spacing.four,
   },
@@ -64,6 +73,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+    // Stretch the content column to the full device height so the page
+    // background never shows through below short content.
+    flexGrow: 1,
+    justifyContent: 'center',
     gap: Spacing.four,
     paddingHorizontal: Spacing.four,
   },

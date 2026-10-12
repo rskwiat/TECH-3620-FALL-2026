@@ -58,9 +58,6 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
@@ -134,7 +131,6 @@ export default function SignupScreen() {
             </ThemedText>
           </ThemedView>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
