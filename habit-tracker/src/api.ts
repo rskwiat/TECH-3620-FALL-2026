@@ -97,3 +97,78 @@ export function logout(token: string): Promise<{ message: string }> {
 export function getProfile(token: string): Promise<User> {
   return request<User>('/profile', { token });
 }
+
+/** A habit row as returned by `GET /api/habits` (the Prisma `Habit` model). */
+export type Habit = {
+  id: number;
+  userId: number;
+  name: string;
+  description: string | null;
+  color: string | null;
+  emoji: string | null;
+  /** `'DAILY'` or `'WEEKLY'`. */
+  frequency: 'DAILY' | 'WEEKLY';
+  /** Completions needed per frequency period (per day for `DAILY` habits). */
+  timesPerPeriod: number;
+  archived: boolean;
+  createdAt: string;
+  lastUpdated: string;
+};
+
+/**
+ * Lists the logged-in user's habits, oldest first. Archived habits are left
+ * out unless `includeArchived` is set. Habit routes answer `404` (not `401`)
+ * for missing or expired tokens, so a rejected fetch still surfaces a message
+ * the screen can show.
+ */
+export function getHabits(token: string, options?: { includeArchived?: boolean }): Promise<Habit[]> {
+  const query = options?.includeArchived ? '?includeArchived=true' : '';
+  return request<Habit[]>(`/api/habits${query}`, { token });
+}
+
+/**
+ * Aggregated history from `GET /api/habits/:id/history` — streaks plus a
+ * per-day completion breakdown over the requested window.
+ */
+export type HabitHistory = {
+  habitId: number;
+  frequency: 'DAILY' | 'WEEKLY';
+  timesPerPeriod: number;
+  /** Completions needed on one day for the goal to count as met. */
+  goalPerDay: number;
+  range: { from: string; to: string };
+  totalCompletions: number;
+  /** Consecutive goal-met days ending today (an unmet today doesn't break it). */
+  currentStreak: number;
+  longestStreak: number;
+  perDay: { date: string; count: number; goalMet: boolean }[];
+};
+
+/**
+ * Fetches one habit's history. `days` picks the window (1–365, default 30) —
+ * a longer window is needed before `currentStreak` stops clipping streaks
+ * that started before it.
+ */
+export function getHabitHistory(
+  token: string,
+  habitId: number,
+  options?: { days?: number },
+): Promise<HabitHistory> {
+  const query = options?.days ? `?days=${options.days}` : '';
+  return request<HabitHistory>(`/api/habits/${habitId}/history${query}`, { token });
+}
+
+/** Fields accepted by `POST /api/habits` — only `name` is required. */
+export type NewHabitInput = {
+  name: string;
+  description?: string;
+  color?: string;
+  emoji?: string;
+  frequency?: Habit['frequency'];
+  timesPerPeriod?: number;
+};
+
+/** Creates a habit for the logged-in user → `201` + the created habit row. */
+export function createHabit(token: string, input: NewHabitInput): Promise<Habit> {
+  return request<Habit>('/api/habits', { method: 'POST', body: input, token });
+}
