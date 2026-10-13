@@ -17,4 +17,38 @@ model User {
   createdAt    DateTime  @default(now())
   lastUpdated  DateTime  @updatedAt
   lastLogin    DateTime?
+  habits       Habit[]
+}
+
+model Habit {
+  id             Int        @id @default(autoincrement())
+  userId         Int
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  color          String?
+  emoji          String?
+  // "DAILY" | "WEEKLY" — Prisma enums are unsupported on SQLite, so this is a
+  // validated string; see routes/habits.ts for the allowed values.
+  frequency      String     @default("DAILY")
+  // How many times the habit should be completed per frequency period
+  // (e.g. 3 times per day, or 2 times per week).
+  timesPerPeriod Int        @default(1)
+  archived       Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  lastUpdated    DateTime   @updatedAt
+  logs           HabitLog[]
+
+  @@index([userId])
+}
+
+model HabitLog {
+  id          Int       @id @default(autoincrement())
+  habitId     Int
+  habit       Habit     @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  completedAt DateTime  @default(now())
+  note        String?
+  createdAt   DateTime  @default(now())
+
+  @@index([habitId, completedAt])
 }

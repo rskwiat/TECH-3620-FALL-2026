@@ -63,7 +63,7 @@ Our api for tracking habits will be built in Express. The API is **JSON-only** �
 
 The API is written in **TypeScript**: source lives in `api/src`, `tsc` compiles it into `api/dist` for production, and `tsx` runs it straight from source for local development.
 
-Data is stored in a SQLite database in the `api/db` folder, accessed through **Prisma ORM v7** (the `better-sqlite3` driver adapter). The Prisma schema lives in `api/prisma/schema.prisma` and the shared client in `api/src/prisma/db.ts`. The auth routes (`/signup`, `/login`, `/profile`) read users from the `User` table; the test-user fixture now only supplies the seed data.
+Data is stored in a SQLite database in the `api/db` folder, accessed through **Prisma ORM v7** (the `better-sqlite3` driver adapter). The Prisma schema lives in `api/prisma/schema.prisma` and the shared client in `api/src/prisma/db.ts`. The auth routes (`/signup`, `/login`, `/profile`) read users from the `User` table, and the habit routes (`/api/habits/...`) read and write the `Habit` and `HabitLog` tables; the test-user fixture now only supplies the seed data.
 
 #### Running the API
 
@@ -95,17 +95,20 @@ Other scripts:
 | `npm run typecheck`   | `tsc --noEmit` — type-check only              |
 | `npm run db:generate` | Regenerates the Prisma client (`prisma generate`) |
 | `npm run db:migrate`  | Applies migrations / creates new ones (`prisma migrate dev`) — then re-runs `prisma generate` so the client always matches the schema |
-| `npm run db:seed`     | Upserts the demo user into SQLite (`tsx prisma/seed.ts`, bcrypt-hashed password) |
+| `npm run db:seed`     | Upserts the demo user into SQLite (`tsx prisma/seed.ts`, bcrypt-hashed password) and seeds the 13 demo habits (with ~6 weeks of completion logs) for every user |
 | `npm run db:studio`   | Opens Prisma Studio to browse `api/db/dev.db` |
 
 The server starts on `http://localhost:3000`. Environment variables are loaded from `api/.env` (copy `api/.env.example` and set `JWT_SECRET` if setting up fresh — `DATABASE_URL` points at the SQLite file and defaults to `file:./db/dev.db`).
 
 #### Database (Prisma v7 + SQLite)
 
-- `api/prisma/schema.prisma` — the schema; the `User` model mirrors the test-user fixture (`name`, `email`, `password`, `home_address`, optional `age`, `createdAt`, `lastUpdated`, `lastLogin`).
+- `api/prisma/schema.prisma` — the schema. Models:
+  - `User` — mirrors the test-user fixture (`name`, `email`, `password`, `home_address`, optional `age`, `createdAt`, `lastUpdated`, `lastLogin`); has a `habits` relation.
+  - `Habit` — a tracked habit owned by a user: `name`, optional `description` / `color` / `emoji`, `frequency` (`"DAILY"` or `"WEEKLY"` — stored as a validated string because Prisma enums aren't supported on SQLite), `timesPerPeriod` (the goal, e.g. 3× per day), `archived` flag, timestamps, and a `userId` foreign key (cascade delete).
+  - `HabitLog` — one completion of a habit: `completedAt`, optional `note`, `habitId` foreign key (cascade delete), indexed on `(habitId, completedAt)`. Multiple logs per day are allowed (for habits with a goal > 1).
 - `api/prisma.config.ts` — Prisma v7 config; the connection URL (`DATABASE_URL`) is read from `api/.env` here instead of from the schema.
 - `api/prisma/migrations/` — migration history (commit these).
-- `api/prisma/seed.ts` — `npm run db:seed` upserts the demo user from `src/data/test-user.ts` with a **bcrypt**-hashed password (also wired as `migrations.seed` in `prisma.config.ts`, so `npx prisma db seed` works).
+- `api/prisma/seed.ts` — `npm run db:seed` upserts the demo user from `src/data/test-user.ts` with a **bcrypt**-hashed password (also wired as `migrations.seed` in `prisma.config.ts`, so `npx prisma db seed` works), then seeds the 13 demo habits from `src/data/demo-habits.ts` — daily/weekly frequencies, goals, colors, emojis, one archived habit, plus ~45 days of deterministic completion logs per habit (safe to re-run: habits are matched by name and existing logs are never overwritten).
 - `api/src/prisma/db.ts` — exports a single shared `PrismaClient` wired to the `better-sqlite3` driver adapter. Import it anywhere: `import { prisma } from '../prisma/db.js'`.
 - `api/src/prisma/generated/` — generated client code (gitignored; re-create with `npm run db:generate` or `npm run db:migrate`). **Regenerate after every schema change** — a stale client still type-checks but fails at runtime, which is why `db:migrate` chains `prisma generate` onto `prisma migrate dev`.
 - `api/db/dev.db` — the SQLite database file itself (gitignored).
@@ -121,6 +124,16 @@ The server starts on `http://localhost:3000`. Environment variables are loaded f
 | POST   | `/login`    | none   | Login with `{ email, password }` → returns JWT + user |
 | GET    | `/profile`  | Bearer | Current logged-in user (password-free)          |
 | POST   | `/logout`   | Bearer | Revokes the current token                       |
+| GET    | `/api/habits` | Bearer | List the current user's habits (oldest first). `?includeArchived=true` includes archived habits |
+| POST   | `/api/habits` | Bearer | Create a habit with `{ name, description?, color?, emoji?, frequency?, timesPerPeriod?, archived? }` → `201`. `frequency` must be `DAILY` or `WEEKLY` (default `DAILY`); `timesPerPeriod` must be a positive integer (default `1`) |
+| DELETE | `/api/habits/:id` | Bearer | Delete a habit and all of its logs (cascade) |
+| GET    | `/api/habits/:id/logs` | Bearer | Raw completion logs, oldest first. Optional `?from=YYYY-MM-DD` / `?to=YYYY-MM-DD` (inclusive) filter by date |
+| POST   | `/api/habits/:id/logs` | Bearer | Record a completion with `{ note?, completedAt? }` → `201`. Multiple logs per day are allowed; `completedAt` defaults to now (handy for backfilling) |
+| GET    | `/api/habits/:id/history` | Bearer | Aggregated history: `currentStreak`, `longestStreak`, `totalCompletions`, and per-day `{ date, count, goalMet }` entries. `?days=1..365` sets the window (default `30`, ending today) |
+
+**A note on habit-route auth:** all `/api/habits` routes respond **`404` (not `401`)** to any unauthenticated request — missing, malformed, expired, or revoked tokens all get `{ "message": "Not found" }`, so the routes appear not to exist. Habit data is always scoped to the logged-in user; another user's habit id also returns `404`.
+
+Streaks and per-day buckets in history use **UTC days**: a day counts toward a streak when its completion count meets the habit's daily goal (`timesPerPeriod` for `DAILY` habits, `1` for `WEEKLY` habits). An unmet "today" doesn't break the current streak.
 
 Example signup:
 
@@ -140,6 +153,35 @@ curl -X POST http://localhost:3000/login \
 
 Use the returned token on protected routes: `Authorization: Bearer <token>`.
 
+Example habit flow (all of these need the Bearer token from signup/login):
+
+```
+# Create a habit
+curl -X POST http://localhost:3000/api/habits \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Drink water","description":"8 glasses","emoji":"💧","frequency":"DAILY","timesPerPeriod":3}'
+
+# List habits
+curl http://localhost:3000/api/habits -H "Authorization: Bearer $TOKEN"
+
+# Log a completion (multiple per day allowed)
+curl -X POST http://localhost:3000/api/habits/1/logs \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"note":"glass 1"}'
+
+# Raw logs, filtered to October
+curl "http://localhost:3000/api/habits/1/logs?from=2026-10-01&to=2026-10-31" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Aggregated history for the last 30 days
+curl "http://localhost:3000/api/habits/1/history?days=30" -H "Authorization: Bearer $TOKEN"
+
+# Delete a habit (and its logs)
+curl -X DELETE http://localhost:3000/api/habits/1 -H "Authorization: Bearer $TOKEN"
+```
+
 #### Current state
 
 - ✅ TypeScript migration — sources in `api/src`, built with `tsc` → `api/dist`, `tsx` for local dev
@@ -150,7 +192,9 @@ Use the returned token on protected routes: `Authorization: Bearer <token>`.
 - ✅ Database-backed auth — `POST /signup`, `POST /login`, and `GET /profile` query the `User` table through Prisma; logins update `lastLogin`
 - ✅ Passwords hashed with **bcrypt** (the `password` column stores a hash, never plain text)
 - ✅ Seed script (`npm run db:seed`) loads the demo user
-- ⏳ Habit CRUD endpoints
+- ✅ `Habit` and `HabitLog` tables (migration `add_habits_and_logs`)
+- ✅ Habit endpoints — `GET`/`POST` `/api/habits`, `DELETE /api/habits/:id`, `GET`/`POST` `/api/habits/:id/logs`, `GET /api/habits/:id/history` (streaks + per-day counts)
+- ✅ Habit routes return `404` (not `401`) for any unauthenticated request, and all queries are scoped to the logged-in user
 
 See `CHANGELOG.md` for a detailed list of changes and `prompts/` for dated session logs.
 

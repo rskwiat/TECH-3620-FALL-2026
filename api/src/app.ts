@@ -10,6 +10,7 @@ import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
+import habitsRouter from './routes/habits.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/', indexRouter);
 app.use('/', authRouter);
 app.use('/users', usersRouter);
 app.use('/health', healthRouter);
+app.use('/api/habits', habitsRouter);
 
 // catch 404 and forward to error handler
 const notFound: RequestHandler = (_req, _res, next) => {
