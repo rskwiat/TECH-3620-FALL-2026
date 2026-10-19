@@ -15,9 +15,15 @@ export const Colors = {
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
     /** Accent used for primary actions (buttons, links, focus). */
-    primary: '#208AEF',
+    primary: '#FF5C39',
+    /** Supporting action color for secondary buttons. */
+    secondary: '#3C87F7',
     /** Error text for form and API messages. */
-    danger: '#C73737',
+    danger: '#f51a0a',
+    /** Positive/confirmation actions. */
+    success: '#16A34A',
+    /** Non-semantic accent for highlights and decorative actions. */
+    accent: '#8B5CF6',
   },
   dark: {
     text: '#ffffff',
@@ -25,8 +31,12 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
-    primary: '#208AEF',
-    danger: '#FF7B72',
+    primary: '#FF5C39',
+    secondary: '#3C87F7',
+    danger: '#f51a0a',
+    /** Darkened for white-label contrast in dark mode. */
+    success: '#15803D',
+    accent: '#A78BFA',
   },
 } as const;
 

@@ -29,10 +29,12 @@ function RootNavigator() {
       {/* Only mount once auth state is known, so the splash covers any redirect. */}
       {!isLoading && <AnimatedSplashOverlay />}
       <Stack screenOptions={{ headerShown: false }}>
-        {/* Authenticated app: tabs behind (app). Unauthenticated users are
-            redirected to the first available screen below — login. */}
+        {/* Authenticated app: tabs behind (app), plus the habit detail stack
+            screen. Unauthenticated users are redirected to the first
+            available screen below — login. */}
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(app)" />
+          <Stack.Screen name="habit" />
         </Stack.Protected>
 
         <Stack.Protected guard={!session}>

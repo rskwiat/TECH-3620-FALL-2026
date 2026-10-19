@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/form-field';
-import { PrimaryButton } from '@/components/primary-button';
+import { Button } from '@/components/ui/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -83,7 +83,7 @@ export default function LoginScreen() {
               onSubmitEditing={onSubmit}
             />
 
-            <PrimaryButton label="Sign in" onPress={onSubmit} loading={submitting} />
+            <Button label="Sign in" onPress={onSubmit} loading={submitting} />
 
             <ThemedText type="small" themeColor="textSecondary" style={styles.footerText}>
               Don&apos;t have an account?{' '}

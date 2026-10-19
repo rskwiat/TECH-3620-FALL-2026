@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import { FormField } from './form-field';
-import { PrimaryButton } from './primary-button';
+import { Button } from './ui/button';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -195,7 +195,7 @@ export function NewHabitModal({ visible, onClose, onCreate }: NewHabitModalProps
             keyboardType="number-pad"
           />
 
-          <PrimaryButton label="Add habit" onPress={onSubmit} loading={submitting} />
+          <Button label="Add habit" onPress={onSubmit} loading={submitting} />
         </ThemedView>
       </KeyboardAvoidingView>
     </Modal>
