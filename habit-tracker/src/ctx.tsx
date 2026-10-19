@@ -3,9 +3,10 @@ import { use, createContext, useEffect, useRef, type PropsWithChildren } from 'r
 import {
   ApiError,
   getProfile,
-  login as requestLogin,
   logout as requestLogout,
+  requestLoginCode,
   signup as requestSignup,
+  verifyLoginCode,
 } from '@/api';
 import type { SignupInput, User } from '@/api';
 import { useStorageState } from '@/useStorageState';
@@ -23,7 +24,10 @@ type AuthContextValue = {
   user: User | null;
   /** `true` while the stored session is being restored from disk. */
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** Requests a one-time login code for an email (delivered via the API console). */
+  requestCode: (email: string) => Promise<void>;
+  /** Verifies a login code; starts the session when it's correct. */
+  verifyCode: (email: string, code: string) => Promise<void>;
   signUp: (input: SignupInput) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -83,8 +87,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
         session,
         user: session?.user ?? null,
         isLoading,
-        signIn: async (email, password) => {
-          const result = await requestLogin(email, password);
+        requestCode: async (email) => {
+          await requestLoginCode(email);
+        },
+        verifyCode: async (email, code) => {
+          const result = await verifyLoginCode(email, code);
           persist({ token: result.token, user: result.user });
         },
         signUp: async (input) => {

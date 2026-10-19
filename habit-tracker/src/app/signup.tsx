@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/form-field';
@@ -15,8 +15,6 @@ export default function SignupScreen() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,20 +25,12 @@ export default function SignupScreen() {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
 
-    if (!trimmedName || !trimmedEmail || !password) {
-      setError('Name, email and password are required');
+    if (!trimmedName || !trimmedEmail) {
+      setError('Name and email are required');
       return;
     }
     if (!trimmedEmail.includes('@')) {
       setError('Email is not valid');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
       return;
     }
 
@@ -48,7 +38,7 @@ export default function SignupScreen() {
     try {
       // On success the session changes and the guard in the root layout
       // redirects away from this screen to the authenticated app.
-      await signUp({ name: trimmedName, email: trimmedEmail, password });
+      await signUp({ name: trimmedName, email: trimmedEmail });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create the account');
     } finally {
@@ -95,26 +85,6 @@ export default function SignupScreen() {
               keyboardType="email-address"
               textContentType="emailAddress"
               autoComplete="email"
-            />
-
-            <FormField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="At least 6 characters"
-              secureTextEntry
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
-
-            <FormField
-              label="Confirm password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Repeat your password"
-              secureTextEntry
-              textContentType="newPassword"
-              autoComplete="new-password"
               returnKeyType="go"
               onSubmitEditing={onSubmit}
             />

@@ -41,6 +41,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Auth is now passwordless — one-time 6-digit login codes.** `/login` no longer takes a password; it takes `{ email }` and issues a code, and a new `/login/verify` takes `{ email, code }` and returns the JWT:
+  - `api/prisma/schema.prisma` drops `User.password` and adds a `LoginCode` model (`userId` FK cascade, `codeHash`, `expiresAt`, `attempts`, `createdAt`, indexed on `userId`); migration `20261015120000_passwordless_login_codes`.
+  - `api/src/data/login-codes.ts` — `generateCode()` uses `crypto.randomInt` (CSPRNG), `hashCode()` stores only a SHA-256 hash, `verifyCode()` compares with `crypto.timingSafeEqual`, plus `CODE_TTL_MS` (10 min) and `MAX_ATTEMPTS` (5) constants.
+  - `POST /login` accepts `{ email }`, deletes any previous code for the user, stores the new hash, and logs the code to the **API console** (`[auth] Login code for <email>: <code> …`) since this POC has no email provider. It always returns the same generic `200` message, so the endpoint can't be used to enumerate accounts (unknown emails log nothing).
+  - `POST /login/verify` returns the same `{ token, tokenType, expiresIn, user }` shape as before. Codes are single-use (cleared on success), expire after 10 minutes, and are invalidated after 5 wrong attempts; every failure returns `401 Invalid or expired code`.
+  - `POST /signup` drops the `password` field (`{ name, email, age?, home_address? }`) and still auto-logs-in.
+  - The client (`habit-tracker`) follows suit: `api.ts` exposes `requestLoginCode` / `verifyLoginCode`, `ctx.tsx` exposes `requestCode` / `verifyCode`, `login.tsx` is a two-step screen (email → code, with resend and "use a different email"), and `signup.tsx` no longer collects a password.
+
+### Removed
+
+- **`bcrypt` and `src/data/passwords.ts`** — no passwords are stored or verified any more, so `hashPassword()` / `verifyPassword()` and the `bcrypt` + `@types/bcrypt` dependencies were deleted.
+
 - **`age` is optional on `User`** — `api/prisma/schema.prisma` changed `age Int` → `age Int?`, applied by migration `20260928222445_make_age_optional`. `/signup` no longer requires an age: omitted or `null` stores `NULL`, and a value that *is* present must still be an integer (`400 Age must be an integer`).
 - **`db:migrate` now regenerates the client** — `prisma migrate dev` created the migration but left the generated client stale, so `prisma.user.create({ age: null })` still failed with `Argument "age" must not be null` even though `tsc` stayed green (`req.body` is `any`, so the bad input type slipped through). `npm run db:migrate` is now `prisma migrate dev && prisma generate`, and the signup handler types the parsed `age` as `unknown` → `number | null` so `tsc` catches this class of bug.
 - **Auth routes are async** — `POST /login` and `GET /profile` now perform database queries, so they are `async` handlers wrapped with `try/catch` that forward failures to `next(error)` (Express 4 does not catch rejected promises).
@@ -56,3 +68,5 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Token denylist is in-memory only — move it to SQLite along with the rest of the session data.
 - No refresh tokens; access-token-only auth.
+- Login codes are printed to the API console (no email/SMS provider wired up) — replace with a real sender before any non-demo use.
+- No rate limiting on `POST /login` — add a resend cooldown / throttle before shipping.

@@ -1,7 +1,6 @@
 import 'dotenv/config';
 
 import prisma from '../src/prisma/db.js';
-import { hashPassword } from '../src/data/passwords.js';
 import testUser from '../src/data/test-user.js';
 import demoHabits from '../src/data/demo-habits.js';
 
@@ -91,20 +90,16 @@ function buildLogs(userId: number, habit: (typeof demoHabits)[number]): Date[] {
  * Run with `npm run db:seed` (or `npx prisma db seed`).
  */
 async function main(): Promise<void> {
-  const password = await hashPassword(testUser.password);
-
   const user = await prisma.user.upsert({
     where: { email: testUser.email },
     update: {
       name: testUser.name,
-      password,
       home_address: testUser.home_address,
       age: testUser.age,
     },
     create: {
       email: testUser.email,
       name: testUser.name,
-      password,
       home_address: testUser.home_address,
       age: testUser.age,
     },

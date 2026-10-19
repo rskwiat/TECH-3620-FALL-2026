@@ -8,16 +8,32 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
+  id           Int         @id @default(autoincrement())
   name         String
-  email        String    @unique
-  password     String
+  email        String      @unique
   home_address String?
   age          Int?
-  createdAt    DateTime  @default(now())
-  lastUpdated  DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  lastUpdated  DateTime    @updatedAt
   lastLogin    DateTime?
   habits       Habit[]
+  loginCodes   LoginCode[]
+}
+
+// A one-time login code (passwordless auth). Only the SHA-256 hash of the
+// 6-digit code is stored, never the plain code. A user has at most one active
+// code at a time — requesting a new code deletes the previous rows.
+model LoginCode {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  // Failed verify attempts against this code; the code dies at MAX_ATTEMPTS.
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Habit {

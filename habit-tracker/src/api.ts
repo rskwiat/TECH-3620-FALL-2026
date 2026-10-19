@@ -19,12 +19,17 @@ export type User = {
   lastLogin: string | null;
 };
 
-/** Successful `POST /login` and `POST /signup` responses. */
+/** Successful `POST /login/verify` and `POST /signup` responses. */
 export type AuthResponse = {
   token: string;
   tokenType: string;
   expiresIn: number;
   user: User;
+};
+
+/** Generic acknowledgement, e.g. a login-code request. */
+export type MessageResponse = {
+  message: string;
 };
 
 /** Error with the HTTP status attached so screens can react to 401/409/etc. */
@@ -70,15 +75,23 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
   return json as T;
 }
 
-/** Email/password login → JWT + user. */
-export function login(email: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>('/login', { method: 'POST', body: { email, password } });
+/**
+ * Requests a one-time login code for an email. The server always returns the
+ * same generic message and (in this POC) prints the code to its console —
+ * there is no email provider wired up yet.
+ */
+export function requestLoginCode(email: string): Promise<MessageResponse> {
+  return request<MessageResponse>('/login', { method: 'POST', body: { email } });
+}
+
+/** Exchanges a 6-digit code for a JWT + user. */
+export function verifyLoginCode(email: string, code: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/login/verify', { method: 'POST', body: { email, code } });
 }
 
 export type SignupInput = {
   name: string;
   email: string;
-  password: string;
   age?: number | null;
   home_address?: string | null;
 };

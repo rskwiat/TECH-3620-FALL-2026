@@ -95,7 +95,7 @@ Other scripts:
 | `npm run typecheck`   | `tsc --noEmit` — type-check only              |
 | `npm run db:generate` | Regenerates the Prisma client (`prisma generate`) |
 | `npm run db:migrate`  | Applies migrations / creates new ones (`prisma migrate dev`) — then re-runs `prisma generate` so the client always matches the schema |
-| `npm run db:seed`     | Upserts the demo user into SQLite (`tsx prisma/seed.ts`, bcrypt-hashed password) and seeds the 13 demo habits (with ~6 weeks of completion logs) for every user |
+| `npm run db:seed`     | Upserts the demo user into SQLite (`tsx prisma/seed.ts`) and seeds the 13 demo habits (with ~6 weeks of completion logs) for every user |
 | `npm run db:studio`   | Opens Prisma Studio to browse `api/db/dev.db` |
 
 The server starts on `http://localhost:3000`. Environment variables are loaded from `api/.env` (copy `api/.env.example` and set `JWT_SECRET` if setting up fresh — `DATABASE_URL` points at the SQLite file and defaults to `file:./db/dev.db`).
@@ -103,9 +103,10 @@ The server starts on `http://localhost:3000`. Environment variables are loaded f
 #### Database (Prisma v7 + SQLite)
 
 - `api/prisma/schema.prisma` — the schema. Models:
-  - `User` — mirrors the test-user fixture (`name`, `email`, `password`, `home_address`, optional `age`, `createdAt`, `lastUpdated`, `lastLogin`); has a `habits` relation.
+  - `User` — mirrors the test-user fixture (`name`, `email`, `home_address`, optional `age`, `createdAt`, `lastUpdated`, `lastLogin`); has `habits` and `loginCodes` relations. There is **no password column** — auth is passwordless (one-time codes).
   - `Habit` — a tracked habit owned by a user: `name`, optional `description` / `color` / `emoji`, `frequency` (`"DAILY"` or `"WEEKLY"` — stored as a validated string because Prisma enums aren't supported on SQLite), `timesPerPeriod` (the goal, e.g. 3× per day), `archived` flag, timestamps, and a `userId` foreign key (cascade delete).
   - `HabitLog` — one completion of a habit: `completedAt`, optional `note`, `habitId` foreign key (cascade delete), indexed on `(habitId, completedAt)`. Multiple logs per day are allowed (for habits with a goal > 1).
+  - `LoginCode` — a one-time login code: `userId` foreign key (cascade delete), `codeHash` (SHA-256 — the plain 6-digit code is never stored), `expiresAt`, `attempts`, `createdAt`. A user has at most one active code; requesting a new one replaces the old.
 - `api/prisma.config.ts` — Prisma v7 config; the connection URL (`DATABASE_URL`) is read from `api/.env` here instead of from the schema.
 - `api/prisma/migrations/` — migration history (commit these).
 - `api/prisma/seed.ts` — `npm run db:seed` upserts the demo user from `src/data/test-user.ts` with a **bcrypt**-hashed password (also wired as `migrations.seed` in `prisma.config.ts`, so `npx prisma db seed` works), then seeds the 13 demo habits from `src/data/demo-habits.ts` — daily/weekly frequencies, goals, colors, emojis, one archived habit, plus ~45 days of deterministic completion logs per habit (safe to re-run: habits are matched by name and existing logs are never overwritten).
@@ -120,8 +121,9 @@ The server starts on `http://localhost:3000`. Environment variables are loaded f
 | GET    | `/`         | none   | JSON placeholder                                |
 | GET    | `/users`    | none   | JSON placeholder                                |
 | GET    | `/health`   | none   | Healthcheck — returns `{ status, uptime, timestamp }` |
-| POST   | `/signup`   | none   | Create an account with `{ name, email, password, age?, home_address? }` → `201` + JWT + user |
-| POST   | `/login`    | none   | Login with `{ email, password }` → returns JWT + user |
+| POST   | `/signup`   | none   | Create an account with `{ name, email, age?, home_address? }` → `201` + JWT + user (passwordless — no password) |
+| POST   | `/login`    | none   | Request a one-time 6-digit login code with `{ email }` → generic `200`. The code is printed to the **API console** (no email provider in this POC) |
+| POST   | `/login/verify` | none | Exchange `{ email, code }` for a JWT → returns JWT + user. Codes are single-use and expire after 10 minutes |
 | GET    | `/profile`  | Bearer | Current logged-in user (password-free)          |
 | POST   | `/logout`   | Bearer | Revokes the current token                       |
 | GET    | `/api/habits` | Bearer | List the current user's habits (oldest first). `?includeArchived=true` includes archived habits |
@@ -131,24 +133,38 @@ The server starts on `http://localhost:3000`. Environment variables are loaded f
 | POST   | `/api/habits/:id/logs` | Bearer | Record a completion with `{ note?, completedAt? }` → `201`. Multiple logs per day are allowed; `completedAt` defaults to now (handy for backfilling) |
 | GET    | `/api/habits/:id/history` | Bearer | Aggregated history: `currentStreak`, `longestStreak`, `totalCompletions`, and per-day `{ date, count, goalMet }` entries. `?days=1..365` sets the window (default `30`, ending today) |
 
+**A note on login (passwordless one-time codes):** login is a two-step flow. `POST /login` with an email always returns the same generic `200` message whether or not the account exists (no account enumeration); for a real account it issues a random 6-digit code, stores only its SHA-256 hash in `LoginCode`, and — since this POC has no email provider — **prints the code to the API server console**:
+
+```
+[auth] Login code for jane.doe@example.com: 698400 (valid for 10 minutes)
+```
+
+Then `POST /login/verify` with `{ email, code }` returns the JWT. Codes expire after **10 minutes**, are **single-use** (cleared on success), and allow at most **5** wrong attempts. Requesting a new code invalidates the previous one.
+
 **A note on habit-route auth:** all `/api/habits` routes respond **`404` (not `401`)** to any unauthenticated request — missing, malformed, expired, or revoked tokens all get `{ "message": "Not found" }`, so the routes appear not to exist. Habit data is always scoped to the logged-in user; another user's habit id also returns `404`.
 
 Streaks and per-day buckets in history use **UTC days**: a day counts toward a streak when its completion count meets the habit's daily goal (`timesPerPeriod` for `DAILY` habits, `1` for `WEEKLY` habits). An unmet "today" doesn't break the current streak.
 
-Example signup:
+Example signup (no password):
 
 ```
 curl -X POST http://localhost:3000/signup \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Jane Doe","email":"jane.doe@example.com","password":"hunter2","age":28}'
+  -d '{"name":"Jane Doe","email":"jane.doe@example.com","age":28}'
 ```
 
-Example login:
+Example login — request a code, read it from the API console, then verify:
 
 ```
+# 1. Request a code (check the API server logs for the 6 digits)
 curl -X POST http://localhost:3000/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"jane.doe@example.com","password":"hunter2"}'
+  -d '{"email":"jane.doe@example.com"}'
+
+# 2. Exchange the code for a token
+curl -X POST http://localhost:3000/login/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"jane.doe@example.com","code":"698400"}'
 ```
 
 Use the returned token on protected routes: `Authorization: Bearer <token>`.
@@ -187,10 +203,10 @@ curl -X DELETE http://localhost:3000/api/habits/1 -H "Authorization: Bearer $TOK
 - ✅ TypeScript migration — sources in `api/src`, built with `tsc` → `api/dist`, `tsx` for local dev
 - ✅ JSON-only API with 404/error handling
 - ✅ Healthcheck endpoint
-- ✅ JWT auth (HS256, 24h expiry) with signup, login, profile, and logout (token revocation)
+- ✅ JWT auth (HS256, 24h expiry) with signup, passwordless code login, profile, and logout (token revocation)
 - ✅ SQLite database via **Prisma v7** (`better-sqlite3` driver adapter) — schema, migrations, and a shared client in `api/src/prisma/db.ts`
-- ✅ Database-backed auth — `POST /signup`, `POST /login`, and `GET /profile` query the `User` table through Prisma; logins update `lastLogin`
-- ✅ Passwords hashed with **bcrypt** (the `password` column stores a hash, never plain text)
+- ✅ Database-backed auth — `POST /signup`, `POST /login` (request code), `POST /login/verify`, and `GET /profile` query the `User` table through Prisma; successful logins update `lastLogin`
+- ✅ **Passwordless one-time codes** — `LoginCode` rows store a SHA-256 hash (never the code); 6 digits, 10-minute expiry, single-use, 5-attempt limit. No email provider yet, so the code is printed to the API console
 - ✅ Seed script (`npm run db:seed`) loads the demo user
 - ✅ `Habit` and `HabitLog` tables (migration `add_habits_and_logs`)
 - ✅ Habit endpoints — `GET`/`POST` `/api/habits`, `DELETE /api/habits/:id`, `GET`/`POST` `/api/habits/:id/logs`, `GET /api/habits/:id/history` (streaks + per-day counts)
