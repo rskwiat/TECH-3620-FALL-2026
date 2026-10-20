@@ -145,6 +145,13 @@ export type HabitHistory = {
 };
 
 /**
+ * History window the app requests per habit, in days. The API defaults to 30,
+ * which would clip any streak that started earlier; the seed generates ~45
+ * days of logs, and the API caps the window at 365.
+ */
+export const HISTORY_WINDOW_DAYS = 60;
+
+/**
  * Fetches one habit's history. `days` picks the window (1–365, default 30) —
  * a longer window is needed before `currentStreak` stops clipping streaks
  * that started before it.

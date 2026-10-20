@@ -3,16 +3,18 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
+  Pressable,
   StyleSheet,
   View,
   type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
-import { createHabit, getHabitHistory, getHabits } from '@/api';
+import { createHabit, getHabitHistory, getHabits, HISTORY_WINDOW_DAYS } from '@/api';
 import type { Habit, NewHabitInput } from '@/api';
 import { NewHabitModal } from '@/components/new-habit-modal';
-import { PrimaryButton } from '@/components/primary-button';
+import { Button } from '@/components/ui/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -36,13 +38,6 @@ type Loaded = {
   error: string | null;
 };
 
-/**
- * History window requested per habit. The API defaults to 30 days, which
- * would clip any streak that started earlier; the seed generates ~45 days of
- * logs, and the API caps the window at 365.
- */
-const STREAK_WINDOW_DAYS = 60;
-
 /** Formats a habit's `lastUpdated` timestamp for the row's meta line. */
 function formatLastUpdated(iso: string): string {
   const date = new Date(iso);
@@ -52,8 +47,9 @@ function formatLastUpdated(iso: string): string {
 /**
  * The Today tab: every habit due today in a FlatList — each row shows the
  * habit's emoji, title, current streak, and when the habit was last updated.
- * The header pins the screen title next to the "+ New Habit" action, which
- * opens React Native's `Modal` via `NewHabitModal`.
+ * Tapping a row pushes the habit's detail screen (`/habit/[id]`). The header
+ * pins the screen title next to the "+ New Habit" action, which opens React
+ * Native's `Modal` via `NewHabitModal`.
  *
  * The FlatList is the screen's scroll container (it is *not* wrapped in the
  * PageTemplate ScrollView, because a virtualized list may not be nested inside
@@ -63,6 +59,7 @@ function formatLastUpdated(iso: string): string {
 export default function TodayScreen() {
   const { session } = useSession();
   const theme = useTheme();
+  const router = useRouter();
 
   const token = session?.token ?? null;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -116,7 +113,7 @@ export default function TodayScreen() {
     let cancelled = false;
 
     loaded.habits.forEach((habit) => {
-      getHabitHistory(token, habit.id, { days: STREAK_WINDOW_DAYS })
+      getHabitHistory(token, habit.id, { days: HISTORY_WINDOW_DAYS })
         .then((history) => {
           if (!cancelled) setStreaks((prev) => ({ ...prev, [habit.id]: history.currentStreak }));
         })
@@ -141,20 +138,27 @@ export default function TodayScreen() {
   const renderItem = ({ item }: ListRenderItemInfo<Habit>) => {
     const emoji = item.emoji?.trim();
     return (
-      <ThemedView type="backgroundElement" style={styles.row}>
-        {/* Fixed-width slot keeps titles aligned when a habit has no emoji. */}
-        <ThemedText
-          style={styles.emoji}
-          themeColor={emoji ? 'text' : 'textSecondary'}>
-          {emoji || '·'}
-        </ThemedText>
-        <View style={styles.rowBody}>
-          <ThemedText>{item.name}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {metaFor(item)}
-          </ThemedText>
-        </View>
-      </ThemedView>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`View details for ${item.name}`}
+        onPress={() => router.push({ pathname: '/habit/[id]', params: { id: String(item.id) } })}>
+        {({ pressed }) => (
+          <ThemedView type="backgroundElement" style={[styles.row, pressed && styles.rowPressed]}>
+            {/* Fixed-width slot keeps titles aligned when a habit has no emoji. */}
+            <ThemedText
+              style={styles.emoji}
+              themeColor={emoji ? 'text' : 'textSecondary'}>
+              {emoji || '·'}
+            </ThemedText>
+            <View style={styles.rowBody}>
+              <ThemedText>{item.name}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {metaFor(item)}
+              </ThemedText>
+            </View>
+          </ThemedView>
+        )}
+      </Pressable>
     );
   };
 
@@ -186,7 +190,7 @@ export default function TodayScreen() {
       edges={['top', 'left', 'right']}>
       <View style={[styles.header, Platform.OS === 'web' && styles.headerWeb]}>
         <ThemedText type="subtitle">Today</ThemedText>
-        <PrimaryButton label="+ New Habit" onPress={() => setModalOpen(true)} />
+        <Button variant="outline" label="+ New Habit" onPress={() => setModalOpen(true)} />
       </View>
 
       <FlatList
@@ -242,6 +246,9 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  rowPressed: {
+    opacity: 0.7,
   },
   emoji: {
     fontSize: 24,
