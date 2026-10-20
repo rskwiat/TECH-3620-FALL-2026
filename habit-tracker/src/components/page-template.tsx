@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PageHeader } from './page-header';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -19,9 +20,9 @@ type PageTemplateProps = {
 };
 
 /**
- * Shared shell for every screen inside the (app) group: a title matching the
- * tab name, an optional subtitle, and either real content or a placeholder
- * card describing what will live here.
+ * Shared shell for every screen inside the (app) group: the shared page header
+ * (title matching the tab name, avatar, optional subtitle) and either real
+ * content or a placeholder card describing what will live here.
  */
 export function PageTemplate({ title, subtitle, placeholder, children }: PageTemplateProps) {
   const theme = useTheme();
@@ -30,17 +31,10 @@ export function PageTemplate({ title, subtitle, placeholder, children }: PageTem
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
       edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webContent]}>
-        <ThemedView style={styles.inner}>
-          <ThemedView style={styles.header}>
-            <ThemedText type="subtitle">{title}</ThemedText>
-            {subtitle ? (
-              <ThemedText themeColor="textSecondary">{subtitle}</ThemedText>
-            ) : null}
-          </ThemedView>
+      <PageHeader title={title} subtitle={subtitle} />
 
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ThemedView style={styles.inner}>
           {children ?? (
             <ThemedView type="backgroundElement" style={styles.card}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -62,26 +56,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
-    justifyContent: 'center',
+    flexGrow: 1,
     paddingBottom: BottomTabInset + Spacing.four,
-  },
-  webContent: {
-    paddingTop: Spacing.six,
   },
   inner: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    // Stretch the content column to the full device height so the page
-    // background never shows through below short content.
-    flexGrow: 1,
-    justifyContent: 'center',
     gap: Spacing.four,
     paddingHorizontal: Spacing.four,
-  },
-  header: {
-    gap: Spacing.one,
+    paddingTop: Spacing.two,
   },
   card: {
     gap: Spacing.three,

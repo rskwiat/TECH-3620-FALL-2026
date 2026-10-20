@@ -2,6 +2,7 @@ import { use, createContext, useEffect, useRef, type PropsWithChildren } from 'r
 
 import {
   ApiError,
+  deleteAccount as requestDeleteAccount,
   getProfile,
   login as requestLogin,
   logout as requestLogout,
@@ -26,6 +27,8 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: SignupInput) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account, then clears the local session. */
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,6 +98,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
           // Revoke the token server-side; clearing it locally always succeeds.
           if (session) {
             await requestLogout(session.token).catch(() => undefined);
+          }
+          persist(null);
+        },
+        deleteAccount: async () => {
+          // Let API errors (network, already deleted) reach the screen so it
+          // can explain why the account is still there.
+          if (session) {
+            await requestDeleteAccount(session.token);
           }
           persist(null);
         },

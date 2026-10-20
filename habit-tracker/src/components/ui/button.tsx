@@ -12,6 +12,9 @@ export type ButtonType = 'primary' | 'secondary' | 'danger' | 'success' | 'accen
 /** Visual treatment: solid background or transparent with a colored border. */
 export type ButtonVariant = 'filled' | 'outline';
 
+/** Padding, minimum height, and label scale. */
+export type ButtonSize = 'small' | 'medium' | 'large';
+
 type ButtonProps = {
   label: string;
   onPress: () => void;
@@ -19,18 +22,21 @@ type ButtonProps = {
   type?: ButtonType;
   /** Filled or outlined treatment. Defaults to `filled`. */
   variant?: ButtonVariant;
+  /** Compact, default, or prominent sizing. Defaults to `medium`. */
+  size?: ButtonSize;
   /** Element rendered before the label (for example, an icon). */
   icon?: ReactNode;
   loading?: boolean;
   disabled?: boolean;
 };
 
-/** The themed call-to-action button, scalable across color types and filled/outline variants. */
+/** The themed call-to-action button, scalable across color types, variants, and sizes. */
 export function Button({
   label,
   onPress,
   type = 'primary',
   variant = 'filled',
+  size = 'medium',
   icon,
   loading = false,
   disabled = false,
@@ -51,6 +57,7 @@ export function Button({
         <View
           style={[
             styles.button,
+            sizeStyles[size],
             isFilled
               ? { backgroundColor: color }
               : { backgroundColor: pressed ? `${color}1A` : 'transparent', borderColor: color, borderWidth: 1 },
@@ -61,7 +68,9 @@ export function Button({
           ) : (
             <View style={styles.content}>
               {icon ? <View>{icon}</View> : null}
-              <ThemedText type="smallBold" style={[styles.label, { color: contentColor }]}>
+              <ThemedText
+                type="smallBold"
+                style={[labelStyles[size], { color: contentColor }]}>
                 {label}
               </ThemedText>
             </View>
@@ -74,19 +83,49 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  label: {
+});
+
+const sizeStyles = StyleSheet.create({
+  small: {
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    // Keep a 44pt touch target even with the tighter padding.
+    minHeight: 44,
+  },
+  medium: {
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    paddingHorizontal: Spacing.four,
+    minHeight: 48,
+  },
+  large: {
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.five,
+    minHeight: 56,
+  },
+});
+
+const labelStyles = StyleSheet.create({
+  small: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  medium: {
     fontSize: 16,
+    lineHeight: 20,
+  },
+  large: {
+    fontSize: 18,
+    lineHeight: 24,
   },
 });

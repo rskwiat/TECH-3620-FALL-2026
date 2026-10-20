@@ -39,7 +39,7 @@ export class ApiError extends Error {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'DELETE';
   body?: Record<string, unknown>;
   token?: string | null;
 };
@@ -98,6 +98,37 @@ export function getProfile(token: string): Promise<User> {
   return request<User>('/profile', { token });
 }
 
+/**
+ * Downloads the logged-in user's habits and completion logs as CSV.
+ * The route answers `text/csv`, so this bypasses the JSON helper above.
+ */
+export async function exportAccountData(token: string): Promise<string> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/api/account/export`, {
+      headers: {
+        Accept: 'text/csv',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new ApiError(0, 'Could not reach the server. Is the API running?');
+  }
+
+  if (!response.ok) {
+    const json = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new ApiError(response.status, json?.message ?? 'Could not export your data.');
+  }
+
+  return response.text();
+}
+
+/** Permanently deletes the account along with its habits and logs. */
+export function deleteAccount(token: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/account', { method: 'DELETE', token });
+}
+
 /** A habit row as returned by `GET /api/habits` (the Prisma `Habit` model). */
 export type Habit = {
   id: number;
@@ -150,6 +181,12 @@ export type HabitHistory = {
  * days of logs, and the API caps the window at 365.
  */
 export const HISTORY_WINDOW_DAYS = 60;
+
+/**
+ * History window the Stats tab requests per habit, in days. The API caps the
+ * window at 365, which is enough to build a year of month buckets.
+ */
+export const STATS_WINDOW_DAYS = 365;
 
 /**
  * Fetches one habit's history. `days` picks the window (1–365, default 30) —

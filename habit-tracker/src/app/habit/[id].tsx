@@ -1,31 +1,19 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { getHabitHistory, getHabits, HISTORY_WINDOW_DAYS } from '@/api';
 import type { Habit, HabitHistory } from '@/api';
-import { Button } from '@/components/ui/button';
+import { HabitCalendar } from '@/components/habit-calendar';
+import { HabitWeeklyChart } from '@/components/habit-weekly-chart';
+import { PageHeader } from '@/components/page-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WeeklyHabitTracker } from '@/components/weekly-habit-tracker';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSession } from '@/ctx';
 import { useTheme } from '@/hooks/use-theme';
-
-/** How many of the most recent days the "Completed days" list shows. */
-const RECENT_DAYS_SHOWN = 14;
-
-/**
- * Formats a `perDay` entry's `YYYY-MM-DD` date. The API's dates are UTC-day
- * buckets, so parse at local midnight to keep the label on the day the user
- * expects.
- */
-function formatDay(date: string): string {
-  const parsed = new Date(`${date}T00:00:00`);
-  return Number.isNaN(parsed.getTime())
-    ? date
-    : parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
 
 /** Result of the detail screen's fetch, tagged with the token and habit it belongs to. */
 type Loaded = {
@@ -49,35 +37,11 @@ function StatCard({ value, label }: { value: string; label: string }) {
 }
 
 /**
- * A single day in the "Completed days" list: the day, how many completions it
- * had against the goal, and whether the goal was met.
- */
-function DayRow({
-  day,
-  goalPerDay,
-}: {
-  day: NonNullable<HabitHistory['perDay'][number]>;
-  goalPerDay: number;
-}) {
-  return (
-    <ThemedView type="backgroundElement" style={styles.dayRow}>
-      <ThemedText type="small" style={styles.dayDate}>
-        {formatDay(day.date)}
-      </ThemedText>
-      <ThemedText
-        type="smallBold"
-        themeColor={day.goalMet ? 'success' : 'textSecondary'}>
-        {`${day.count}/${goalPerDay} ${day.goalMet ? '✓' : ''}`.trim()}
-      </ThemedText>
-    </ThemedView>
-  );
-}
-
-/**
  * Habit detail screen (`/habit/[id]`), pushed from a Today row. Shows the
  * habit's name/emoji/description, its current streak, best (longest) streak,
- * completion totals from `GET /api/habits/:id/history`, and the most recent
- * days with whether the goal was met. View-only for now.
+ * completion totals from `GET /api/habits/:id/history`, a weekly consistency
+ * chart, a Monday–Sunday weekly tracker, and the last 28 days as a calendar
+ * widget. View-only for now.
  *
  * It lives at the root level rather than inside `(app)` so it gets real stack
  * push/back behavior — the `(app)` group is a tab navigator, and every route
@@ -86,7 +50,6 @@ function DayRow({
 export default function HabitDetailScreen() {
   const { session } = useSession();
   const theme = useTheme();
-  const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
 
   const token = session?.token ?? null;
@@ -138,10 +101,6 @@ export default function HabitDetailScreen() {
 
   /** Days within the window where the goal was met — the "completed" count. */
   const daysGoalMet = history?.perDay.filter((day) => day.goalMet).length ?? 0;
-  /** Newest first, capped so the list stays a glanceable summary. */
-  const recentDays = history
-    ? [...history.perDay].reverse().slice(0, RECENT_DAYS_SHOWN)
-    : [];
 
   const renderBody = () => {
     if (!hasValidId) {
@@ -188,12 +147,7 @@ export default function HabitDetailScreen() {
             <ThemedText style={styles.heroEmoji} themeColor={emoji ? 'text' : 'textSecondary'}>
               {emoji || '·'}
             </ThemedText>
-            <View style={styles.heroBody}>
-              <ThemedText type="subtitle">{habit.name}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {frequencyLabel}
-              </ThemedText>
-            </View>
+            <ThemedText themeColor="textSecondary">{frequencyLabel}</ThemedText>
           </View>
           {habit.description ? (
             <ThemedText type="small" themeColor="textSecondary">
@@ -213,16 +167,22 @@ export default function HabitDetailScreen() {
         </View>
 
         <View style={styles.section}>
-          <ThemedText type="smallBold">
-            {`Completed days — last ${Math.min(RECENT_DAYS_SHOWN, history.perDay.length)}`}
-          </ThemedText>
-          {recentDays.length === 0 ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              No completions in the last {HISTORY_WINDOW_DAYS} days yet.
-            </ThemedText>
-          ) : (
-            recentDays.map((day) => <DayRow key={day.date} day={day} goalPerDay={history.goalPerDay} />)
-          )}
+          <ThemedText type="smallBold">Weekly consistency</ThemedText>
+          <HabitWeeklyChart
+            days={history.perDay}
+            frequency={history.frequency}
+            timesPerPeriod={history.timesPerPeriod}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="smallBold">Weekly tracker</ThemedText>
+          <WeeklyHabitTracker days={history.perDay} goalPerDay={history.goalPerDay} />
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="smallBold">Completed days</ThemedText>
+          <HabitCalendar days={history.perDay} goalPerDay={history.goalPerDay} />
         </View>
       </>
     );
@@ -232,14 +192,9 @@ export default function HabitDetailScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
       edges={['top', 'left', 'right']}>
-      <View style={[styles.header, Platform.OS === 'web' && styles.headerWeb]}>
-        <Button variant="outline" label="← Back" onPress={() => router.back()} />
-      </View>
+      <PageHeader title={habit?.name ?? 'Habit'} showBack />
 
-      <ScrollView
-        contentContainerStyle={styles.content}>
-        {renderBody()}
-      </ScrollView>
+      <ScrollView contentContainerStyle={styles.content}>{renderBody()}</ScrollView>
     </SafeAreaView>
   );
 }
@@ -247,16 +202,6 @@ export default function HabitDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-  },
-  header: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  headerWeb: {
-    paddingTop: Spacing.six,
   },
   content: {
     flexGrow: 1,
@@ -285,10 +230,6 @@ const styles = StyleSheet.create({
     width: 48,
     textAlign: 'center',
   },
-  heroBody: {
-    flex: 1,
-    gap: Spacing.one,
-  },
   statGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -309,16 +250,5 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.two,
-  },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  dayDate: {
-    flex: 1,
   },
 });

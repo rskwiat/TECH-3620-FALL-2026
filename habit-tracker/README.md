@@ -40,7 +40,8 @@ The app ships with an email/password auth flow backed by the Express API in [`..
 
 The four authenticated tabs are **Today**, **Weekly**, **Stats**, and **Settings**. Each is a
 templated page built on `src/components/page-template.tsx`, so every screen shows a default
-title matching its tab name. Account details and **sign out** live on the Settings tab.
+title matching its tab name. Account details, **CSV export**, **account deletion**, and
+**sign out** live on the Settings tab.
 
 - `src/app/_layout.tsx` wraps the app in a `SessionProvider` and uses
   [`Stack.Protected`](https://docs.expo.dev/router/advanced/protected/) guards:
@@ -49,8 +50,8 @@ title matching its tab name. Account details and **sign out** live on the Settin
 - `src/ctx.tsx` holds the session (JWT + user). It is persisted with `expo-secure-store`
   on device and `localStorage` on web, and a restored token is re-checked against
   `GET /profile` once on launch.
-- `src/api.ts` is the fetch client for `POST /login`, `POST /signup`, `POST /logout` and
-  `GET /profile`.
+- `src/api.ts` is the fetch client for `POST /login`, `POST /signup`, `POST /logout`,
+  `GET /profile`, `GET /api/account/export`, and `DELETE /api/account`.
 
 To run the flow end to end:
 
