@@ -8,9 +8,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Weekly tab** — the Weekly screen (`habit-tracker/src/app/(app)/weekly.tsx`) is now a real progress view instead of a placeholder:
+  - New `WeeklyCompletionView` (`src/components/weekly-completion-view.tsx`) aggregates every active habit into one Monday–Sunday grid. Each day is tinted by the share of habits complete that day (all/some/none/upcoming), shows `completed/total` and a mini ratio bar, and the card leads with the week's overall percentage plus an `X of Y habit check-ins complete` footer. Daily habits count once their daily goal is met; weekly habits count once they log any completion that day.
+  - A `FlatList` of each habit's week: emoji, name, percentage, progress bar, and a `4 of 5 days met · Daily` / `2 of 3 completions · Weekly` line, with a `✓` once the week's goal is met. Rows push `/habit/[id]`.
+  - Loads `GET /api/habits` then every habit's 60-day history in parallel, anchored to the newest `perDay` bucket (the API's UTC today) so future days read as upcoming. Uses the same `FlatList`-as-scroll-container and derived loading/error pattern as the Today tab.
+
+- **Weekly habit tracker** — a reusable Monday–Sunday widget (`habit-tracker/src/components/weekly-habit-tracker.tsx`) now sits on the habit detail screen above the 28-day calendar:
+  - Seven day columns with weekday initials and day numbers, tinted by completion state (opaque primary = goal met, 50% = partial, 10% = none), while days still to come use the muted `backgroundSelected` fill.
+  - Header shows the visible date range and an `X of Y days met` count; a four-item legend covers Complete / Partial / Incomplete / Upcoming.
+  - Built from the same `perDay` history as `HabitCalendar` (no extra requests) and anchored to its newest entry, so the week follows the API's UTC "today". `weekStartsOn` (default Monday), `title`, and `showLegend` props keep it reusable on other screens.
+
+- **Today welcome + summary cards** — the Today tab (`habit-tracker/src/app/(app)/index.tsx`) now opens with:
+  - A welcome block greeting the signed-in user by first name (`Good morning` / `Good afternoon` / `Good evening`) plus one of 12 habit-themed affirmations, picked at random when the screen mounts.
+  - Two side-by-side cards above the list. **Daily progress** shows the percentage of non-archived habits whose goal is met in the API's current (UTC) day, with a themed progress bar and `X of Y habits done`. **Current streak** shows the longest `currentStreak` among those habits, labeled with the habit's emoji and name.
+  - Both cards reuse the per-habit `getHabitHistory` calls the rows already make (no extra requests) and show `—` until every lookup settles. The welcome block, section header, cards, and habit rows all live in the `FlatList`'s `ListHeaderComponent`, so they scroll together.
+
 - **Habit detail screen** — tapping a habit row on the Today tab now pushes a new root-level route `/habit/[id]` (`src/app/habit/[id].tsx`) showing that habit's streaks and completion history:
   - Hero card (emoji, name, frequency line like `Daily · 8× per day`, description) plus four stat cards: 🔥 current streak, 🏆 best streak (`longestStreak`), ✅ total completions, and 📅 days goal met within the window.
-  - "Completed days" list — the last 14 `perDay` entries newest-first, each showing the date and `count/goalPerDay` with a `✓` when the goal was met (an unmet today doesn't break the streak, matching the API's semantics).
+  - **28-day calendar** (`src/components/habit-calendar.tsx`) — the last 28 `perDay` entries in a four-row, seven-column widget with weekday initials, the visible date range, and a Complete/Partial/Incomplete legend. Each day square is tinted with the theme's primary at full opacity when the goal was met, 50% when the day has completions but falls short of the goal, and 10% when there are none; day numbers use white text on complete days and themed text elsewhere.
+  - **Weekly consistency chart** (`src/components/habit-weekly-chart.tsx`) — a bar chart of the last eight Monday–Sunday weeks, each bar showing that week's consistency percentage above it and the week's start date below. Daily habits measure the share of days the daily goal was met; weekly habits measure progress toward `timesPerPeriod` completions per week. A partial week at the start of the history window is dropped, the in-progress current week is drawn faded and counted through today, and the card shows the window average. Bars are grouped for screen readers with a per-week description.
   - Reads `GET /api/habits` (habit row) and `GET /api/habits/:id/history?days=60` in parallel; loading/error/not-found states follow the Today screen's derived-state pattern. View-only for now.
   - Lives at the root stack level (the `(app)` group is a `NativeTabs` navigator where every route is a tab) and is registered in `Stack.Protected guard={!!session}`, so signed-out users are redirected to login.
   - Today rows (`src/app/(app)/index.tsx`) are now `Pressable` with pressed feedback and push the detail route via the typed object href (`{ pathname: '/habit/[id]', params: { id } }`); `STREAK_WINDOW_DAYS` moved from `index.tsx` into `src/api.ts` as the shared `HISTORY_WINDOW_DAYS` (60), since both screens need it.
@@ -71,6 +87,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Logout route** — `POST /logout` (protected) revokes the current token via an in-memory denylist (`api/data/token-denylist.js`), keyed by a unique `jti` claim added to each issued token. Revoked tokens are rejected with `401` on subsequent requests; entries prune themselves as tokens expire.
 
 ### Changed
+
+- **Button sizes** — `habit-tracker/src/components/ui/button.tsx` gains a `size` prop (`small` | `medium` | `large`, default `medium`) so padding and label sizes can scale together:
+  - `small` — 14px label, 16px horizontal padding, 8px radius, 44pt minimum touch target; `medium` keeps the previous 16px label / 24px padding / 48pt height; `large` — 18px label, 32px padding, 56pt height.
+  - The Today tab's **+ New Habit** button and the habit detail screen's **← Back** button now use `size="small"`, tightening those header rows without shrinking their touch targets. Form submit buttons stay `medium`.
 
 - **`age` is optional on `User`** — `api/prisma/schema.prisma` changed `age Int` → `age Int?`, applied by migration `20260928222445_make_age_optional`. `/signup` no longer requires an age: omitted or `null` stores `NULL`, and a value that *is* present must still be an integer (`400 Age must be an integer`).
 - **`db:migrate` now regenerates the client** — `prisma migrate dev` created the migration but left the generated client stale, so `prisma.user.create({ age: null })` still failed with `Argument "age" must not be null` even though `tsc` stayed green (`req.body` is `any`, so the bad input type slipped through). `npm run db:migrate` is now `prisma migrate dev && prisma generate`, and the signup handler types the parsed `age` as `unknown` → `number | null` so `tsc` catches this class of bug.

@@ -130,8 +130,10 @@ The server starts on `http://localhost:3000`. Environment variables are loaded f
 | GET    | `/api/habits/:id/logs` | Bearer | Raw completion logs, oldest first. Optional `?from=YYYY-MM-DD` / `?to=YYYY-MM-DD` (inclusive) filter by date |
 | POST   | `/api/habits/:id/logs` | Bearer | Record a completion with `{ note?, completedAt? }` → `201`. Multiple logs per day are allowed; `completedAt` defaults to now (handy for backfilling) |
 | GET    | `/api/habits/:id/history` | Bearer | Aggregated history: `currentStreak`, `longestStreak`, `totalCompletions`, and per-day `{ date, count, goalMet }` entries. `?days=1..365` sets the window (default `30`, ending today) |
+| GET    | `/api/account/export` | Bearer | CSV export of the user's habits and completion logs (one row per log; habits without logs get one row). For the POC the CSV is also printed to the API server log |
+| DELETE | `/api/account` | Bearer | Permanently delete the account, its habits, and logs, then revoke the current token |
 
-**A note on habit-route auth:** all `/api/habits` routes respond **`404` (not `401`)** to any unauthenticated request — missing, malformed, expired, or revoked tokens all get `{ "message": "Not found" }`, so the routes appear not to exist. Habit data is always scoped to the logged-in user; another user's habit id also returns `404`.
+**A note on habit-route auth:** all `/api/habits` and `/api/account` routes respond **`404` (not `401`)** to any unauthenticated request — missing, malformed, expired, or revoked tokens all get `{ "message": "Not found" }`, so the routes appear not to exist. Habit data is always scoped to the logged-in user; another user's habit id also returns `404`.
 
 Streaks and per-day buckets in history use **UTC days**: a day counts toward a streak when its completion count meets the habit's daily goal (`timesPerPeriod` for `DAILY` habits, `1` for `WEEKLY` habits). An unmet "today" doesn't break the current streak.
 
@@ -195,6 +197,7 @@ curl -X DELETE http://localhost:3000/api/habits/1 -H "Authorization: Bearer $TOK
 - ✅ `Habit` and `HabitLog` tables (migration `add_habits_and_logs`)
 - ✅ Habit endpoints — `GET`/`POST` `/api/habits`, `DELETE /api/habits/:id`, `GET`/`POST` `/api/habits/:id/logs`, `GET /api/habits/:id/history` (streaks + per-day counts)
 - ✅ Habit routes return `404` (not `401`) for any unauthenticated request, and all queries are scoped to the logged-in user
+- ✅ Account data controls — CSV export (`GET /api/account/export`, logged server-side for the POC) and permanent account deletion (`DELETE /api/account`) with cascading habit/log removal
 
 See `CHANGELOG.md` for a detailed list of changes and `prompts/` for dated session logs.
 
