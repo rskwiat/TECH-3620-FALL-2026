@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 import { getHabitHistory, getHabits, STATS_WINDOW_DAYS } from '@/api';
 import type { Habit, HabitHistory } from '@/api';
@@ -207,6 +208,19 @@ export default function StatsScreen() {
 
   const token = session?.token ?? null;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // Bumped whenever the tab regains focus so logs added elsewhere show up.
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const hasFocused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocused.current) {
+        hasFocused.current = true;
+        return;
+      }
+      setRefreshKey((key) => key + 1);
+    }, []),
+  );
 
   const isLoading = Boolean(token) && (!loaded || loaded.token !== token);
   const error = isLoading ? null : loaded?.error ?? null;
@@ -242,7 +256,7 @@ export default function StatsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, refreshKey]);
 
   const totalCompletions = stats.reduce((sum, { history }) => sum + history.totalCompletions, 0);
   const best = bestStreak(stats);

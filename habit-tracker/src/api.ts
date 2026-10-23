@@ -202,6 +202,39 @@ export function getHabitHistory(
   return request<HabitHistory>(`/api/habits/${habitId}/history${query}`, { token });
 }
 
+/** A completion log as returned by `POST /api/habits/:id/logs`. */
+export type HabitLog = {
+  id: number;
+  habitId: number;
+  completedAt: string;
+  note: string | null;
+  createdAt: string;
+};
+
+/** Fields accepted by `POST /api/habits/:id/logs` — both are optional. */
+export type NewHabitLogInput = {
+  /** When the completion happened; defaults to now on the server. */
+  completedAt?: string;
+  note?: string;
+};
+
+/**
+ * Records one completion for a habit. Multiple completions per day are
+ * allowed, which is how a `DAILY` habit with `timesPerPeriod > 1` reaches its
+ * goal. Omit `completedAt` to log the completion for right now.
+ */
+export function createHabitLog(
+  token: string,
+  habitId: number,
+  input: NewHabitLogInput = {},
+): Promise<HabitLog> {
+  return request<HabitLog>(`/api/habits/${habitId}/logs`, {
+    method: 'POST',
+    body: { ...input },
+    token,
+  });
+}
+
 /** Fields accepted by `POST /api/habits` — only `name` is required. */
 export type NewHabitInput = {
   name: string;

@@ -3,13 +3,19 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 
-import { getHabitHistory, getHabits, HISTORY_WINDOW_DAYS } from '@/api';
+import {
+  createHabitLog,
+  getHabitHistory,
+  getHabits,
+  HISTORY_WINDOW_DAYS,
+} from '@/api';
 import type { Habit, HabitHistory } from '@/api';
 import { HabitCalendar } from '@/components/habit-calendar';
 import { HabitWeeklyChart } from '@/components/habit-weekly-chart';
 import { PageHeader } from '@/components/page-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { WeeklyHabitTracker } from '@/components/weekly-habit-tracker';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSession } from '@/ctx';
@@ -38,10 +44,11 @@ function StatCard({ value, label }: { value: string; label: string }) {
 
 /**
  * Habit detail screen (`/habit/[id]`), pushed from a Today row. Shows the
- * habit's name/emoji/description, its current streak, best (longest) streak,
- * completion totals from `GET /api/habits/:id/history`, a weekly consistency
- * chart, a Monday–Sunday weekly tracker, and the last 28 days as a calendar
- * widget. View-only for now.
+ * habit's name/emoji/description, today's progress with a "log completion"
+ * action that writes to `POST /api/habits/:id/logs`, its current streak, best
+ * (longest) streak, completion totals from `GET /api/habits/:id/history`, a
+ * weekly consistency chart, a Monday–Sunday weekly tracker, and the last 28
+ * days as a calendar widget.
  *
  * It lives at the root level rather than inside `(app)` so it gets real stack
  * push/back behavior — the `(app)` group is a tab navigator, and every route
@@ -58,6 +65,11 @@ export default function HabitDetailScreen() {
   const hasValidId = rawId !== undefined && Number.isInteger(habitId) && habitId > 0;
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // Bumped after a completion is logged so the history (and every stat derived
+  // from it) refetches. The current data stays on screen while that happens.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [logging, setLogging] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
 
   // Loading and error are derived from which token/habit's result we have, so
   // the effect never sets state synchronously (see TodayScreen) — a stale
@@ -97,7 +109,24 @@ export default function HabitDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [token, habitId, hasValidId]);
+  }, [token, habitId, hasValidId, refreshKey]);
+
+  /** Writes one completion for right now, then reloads the history. */
+  const onLogCompletion = async () => {
+    if (!token || !habit || logging) return;
+
+    setLogging(true);
+    setLogError(null);
+
+    try {
+      await createHabitLog(token, habit.id);
+      setRefreshKey((key) => key + 1);
+    } catch (cause) {
+      setLogError(cause instanceof Error ? cause.message : 'Could not log this completion.');
+    } finally {
+      setLogging(false);
+    }
+  };
 
   /** Days within the window where the goal was met — the "completed" count. */
   const daysGoalMet = history?.perDay.filter((day) => day.goalMet).length ?? 0;
@@ -140,6 +169,18 @@ export default function HabitDetailScreen() {
         ? `Daily · ${habit.timesPerPeriod}× per day`
         : `Weekly · ${habit.timesPerPeriod}× per week`;
 
+    // `perDay` is oldest → newest, so the last entry is the API's current day.
+    const today = history.perDay[history.perDay.length - 1];
+    const todayCount = today?.count ?? 0;
+    const goalMetToday = today?.goalMet ?? false;
+    const todayPercent = Math.min(
+      100,
+      Math.round((todayCount / Math.max(history.goalPerDay, 1)) * 100),
+    );
+    const completionsLabel = `${todayCount} of ${Math.max(history.goalPerDay, 1)} ${
+      history.goalPerDay === 1 ? 'completion' : 'completions'
+    }`;
+
     return (
       <>
         <ThemedView type="backgroundElement" style={styles.card}>
@@ -152,6 +193,53 @@ export default function HabitDetailScreen() {
           {habit.description ? (
             <ThemedText type="small" themeColor="textSecondary">
               {habit.description}
+            </ThemedText>
+          ) : null}
+        </ThemedView>
+
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <View style={styles.logHeader}>
+            <View style={styles.logHeaderText}>
+              <ThemedText type="smallBold">Today</ThemedText>
+              <ThemedText
+                type="small"
+                themeColor={goalMetToday ? 'success' : 'textSecondary'}>
+                {goalMetToday
+                  ? `✓ Goal met — ${completionsLabel} logged`
+                  : `${completionsLabel} logged`}
+              </ThemedText>
+            </View>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              {`${todayPercent}%`}
+            </ThemedText>
+          </View>
+
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel="Today's progress"
+            accessibilityValue={{ min: 0, max: 100, now: todayPercent }}
+            style={[styles.progressTrack, { backgroundColor: theme.backgroundSelected }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${todayPercent}%`,
+                  backgroundColor: goalMetToday ? theme.success : theme.primary,
+                },
+              ]}
+            />
+          </View>
+
+          <Button
+            label={goalMetToday ? 'Log another completion' : 'Log completion'}
+            type={goalMetToday ? 'secondary' : 'primary'}
+            onPress={onLogCompletion}
+            loading={logging}
+          />
+
+          {logError ? (
+            <ThemedText type="small" themeColor="danger">
+              {logError}
             </ThemedText>
           ) : null}
         </ThemedView>
@@ -229,6 +317,25 @@ const styles = StyleSheet.create({
     lineHeight: 48,
     width: 48,
     textAlign: 'center',
+  },
+  logHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  logHeaderText: {
+    flex: 1,
+    gap: Spacing.one,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
   },
   statGrid: {
     flexDirection: 'row',

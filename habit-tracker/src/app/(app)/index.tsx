@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +8,7 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { createHabit, getHabitHistory, getHabits, HISTORY_WINDOW_DAYS } from '@/api';
 import type { Habit, NewHabitInput } from '@/api';
@@ -113,6 +113,20 @@ export default function TodayScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   // Bumped after a habit is created so the habits effect fetches again.
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Returning to this tab (for example after logging a completion on a habit's
+  // detail screen) should refresh the streaks and today's progress. The first
+  // focus is skipped because the habits effect already loads on mount.
+  const hasFocused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocused.current) {
+        hasFocused.current = true;
+        return;
+      }
+      setRefreshKey((key) => key + 1);
+    }, []),
+  );
   // Picked once per mount so the welcome block doesn't reshuffle on re-render.
   const [affirmation] = useState(
     () => AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)],

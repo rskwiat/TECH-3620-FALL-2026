@@ -8,6 +8,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Log habit completions** — the habit detail screen (`habit-tracker/src/app/habit/[id].tsx`) is no longer view-only:
+  - A new **Today** card above the stats shows `X of Y completions` for the API's current (UTC) day, a themed progress bar that turns green once the goal is met, and a **Log completion** button (labeled **Log another completion** afterwards). Pressing it calls `POST /api/habits/:id/logs` for right now, shows a spinner while saving, and surfaces API errors inline; on success the history reloads so the count, progress, streaks, charts, and calendar all update without leaving the screen.
+  - `src/api.ts` gains `HabitLog`, `NewHabitLogInput`, and `createHabitLog()`.
+  - Today, Weekly, and Stats now refetch when their tab regains focus (skipping the first focus so mount still loads once), so a completion logged on the detail screen shows up in the Today progress/streak cards and the Weekly/Stats widgets.
+
 - **Weekly tab** — the Weekly screen (`habit-tracker/src/app/(app)/weekly.tsx`) is now a real progress view instead of a placeholder:
   - New `WeeklyCompletionView` (`src/components/weekly-completion-view.tsx`) aggregates every active habit into one Monday–Sunday grid. Each day is tinted by the share of habits complete that day (all/some/none/upcoming), shows `completed/total` and a mini ratio bar, and the card leads with the week's overall percentage plus an `X of Y habit check-ins complete` footer. Daily habits count once their daily goal is met; weekly habits count once they log any completion that day.
   - A `FlatList` of each habit's week: emoji, name, percentage, progress bar, and a `4 of 5 days met · Daily` / `2 of 3 completions · Weekly` line, with a `✓` once the week's goal is met. Rows push `/habit/[id]`.
@@ -27,7 +32,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Hero card (emoji, name, frequency line like `Daily · 8× per day`, description) plus four stat cards: 🔥 current streak, 🏆 best streak (`longestStreak`), ✅ total completions, and 📅 days goal met within the window.
   - **28-day calendar** (`src/components/habit-calendar.tsx`) — the last 28 `perDay` entries in a four-row, seven-column widget with weekday initials, the visible date range, and a Complete/Partial/Incomplete legend. Each day square is tinted with the theme's primary at full opacity when the goal was met, 50% when the day has completions but falls short of the goal, and 10% when there are none; day numbers use white text on complete days and themed text elsewhere.
   - **Weekly consistency chart** (`src/components/habit-weekly-chart.tsx`) — a bar chart of the last eight Monday–Sunday weeks, each bar showing that week's consistency percentage above it and the week's start date below. Daily habits measure the share of days the daily goal was met; weekly habits measure progress toward `timesPerPeriod` completions per week. A partial week at the start of the history window is dropped, the in-progress current week is drawn faded and counted through today, and the card shows the window average. Bars are grouped for screen readers with a per-week description.
-  - Reads `GET /api/habits` (habit row) and `GET /api/habits/:id/history?days=60` in parallel; loading/error/not-found states follow the Today screen's derived-state pattern. View-only for now.
+  - Reads `GET /api/habits` (habit row) and `GET /api/habits/:id/history?days=60` in parallel; loading/error/not-found states follow the Today screen's derived-state pattern.
   - Lives at the root stack level (the `(app)` group is a `NativeTabs` navigator where every route is a tab) and is registered in `Stack.Protected guard={!!session}`, so signed-out users are redirected to login.
   - Today rows (`src/app/(app)/index.tsx`) are now `Pressable` with pressed feedback and push the detail route via the typed object href (`{ pathname: '/habit/[id]', params: { id } }`); `STREAK_WINDOW_DAYS` moved from `index.tsx` into `src/api.ts` as the shared `HISTORY_WINDOW_DAYS` (60), since both screens need it.
 
