@@ -145,6 +145,18 @@ exported CSV to the server log.
 
 ---
 
+## 2026-10-23 — Log habit completions
+
+Context: wiring the app to the existing `POST /api/habits/:id/logs` endpoint, adding a Today
+progress card and **Log completion** button to the habit detail screen, and refreshing the
+Today/Weekly/Stats tabs when they regain focus.
+
+1. **currently there is no way to add to your habit logs, when clicking on a habit from the homescreen you should be able to add to your habit data**
+
+2. **save all prompts**
+
+---
+
 ## Summary
 
 | Date | Session | Prompts |
@@ -154,4 +166,5 @@ exported CSV to the server log.
 | 2026-10-05 | Authenticated tabs | 2 |
 | 2026-10-12 | Today screen + habit API | 8 |
 | 2026-10-19 | Habit detail + settings data controls | 4 |
-| **Total** | | **40** |
+| 2026-10-23 | Habit logging | 2 |
+| **Total** | | **42** |
