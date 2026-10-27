@@ -282,10 +282,7 @@ export default function HabitDetailScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
       edges={['top', 'left', 'right']}>
-      <PageHeader
-        title="Habit"
-        actions={<Button variant="outline" label="← Back" onPress={() => router.back()} />}
-      />
+      <PageHeader title={habit?.name ?? 'Habit'} showBack />
 
       <ScrollView
         contentContainerStyle={styles.content}>

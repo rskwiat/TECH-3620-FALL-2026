@@ -198,10 +198,13 @@ export default function TodayScreen() {
       edges={['top', 'left', 'right']}>
       <PageHeader
         title="Today"
-        actions={
-          <Button variant="outline" label="+ New Habit" onPress={() => setModalOpen(true)} />
-        }
       />
+
+      <View style={styles.sectionHeader}>
+        <ThemedText style={styles.sectionTitle}>Today&apos;s Habits</ThemedText>
+        <Button variant="outline" label="+ New Habit" onPress={() => setModalOpen(true)} />
+      </View>
+
 
       <FlatList
         data={habits}
@@ -241,6 +244,17 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
   },
   rowPressed: {
     opacity: 0.7,

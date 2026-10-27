@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 type PageTemplateProps = {
   /** Page title — keep it identical to the tab's label. */
   title: string;
+  subtitle?: string;
   /** Copy for the placeholder card when no `children` are supplied. */
   placeholder?: string;
   children?: ReactNode;
@@ -22,14 +23,14 @@ type PageTemplateProps = {
  * (avatar plus the title matching the tab name, pinned to the top) and either
  * real content or a placeholder card describing what will live here.
  */
-export function PageTemplate({ title, placeholder, children }: PageTemplateProps) {
+export function PageTemplate({ title, subtitle, placeholder, children }: PageTemplateProps) {
   const theme = useTheme();
 
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
       edges={['top', 'left', 'right']}>
-      <PageHeader title={title} />
+      <PageHeader title={title} subtitle={subtitle} />
 
       <ScrollView
         style={styles.scroll}
