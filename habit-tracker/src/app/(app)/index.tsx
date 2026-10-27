@@ -1,19 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   View,
   type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { createHabit, getHabitHistory, getHabits, HISTORY_WINDOW_DAYS } from '@/api';
 import type { Habit, NewHabitInput } from '@/api';
 import { NewHabitModal } from '@/components/new-habit-modal';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,8 +47,9 @@ function formatLastUpdated(iso: string): string {
 /**
  * The Today tab: every habit due today in a FlatList — each row shows the
  * habit's emoji, title, current streak, and when the habit was last updated.
- * Tapping a row pushes the habit's detail screen (`/habit/[id]`). The header
- * pins the screen title next to the "+ New Habit" action, which opens React
+ * Tapping a row pushes the habit's detail screen (`/habit/[id]`). The shared
+ * `PageHeader` renders the avatar and screen title at the top, with the
+ * "+ New Habit" action hanging off its right edge; the action opens React
  * Native's `Modal` via `NewHabitModal`.
  *
  * The FlatList is the screen's scroll container (it is *not* wrapped in the
@@ -75,26 +76,33 @@ export default function TodayScreen() {
   const error = isLoading ? null : loaded?.error ?? null;
   const habits = isLoading ? [] : loaded?.habits ?? [];
 
-  useEffect(() => {
-    if (!token) return;
+  // Fetch on focus rather than mount alone: returning to this tab (a back
+  // navigation from the detail screen, or a tab switch) refetches, so habits
+  // deleted or logged elsewhere never linger on the list. `useCallback` deps
+  // keep the create-habit refresh working, and a refetch keeps the current
+  // rows on screen until the fresh ones land.
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) return;
 
-    // Ignore responses that land after the token changed or the screen unmounted.
-    let cancelled = false;
+      // Ignore responses that land after the token changed or the screen lost focus.
+      let cancelled = false;
 
-    getHabits(token)
-      .then((result) => {
-        if (!cancelled) setLoaded({ token, refreshKey, habits: todaysHabits(result), error: null });
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        const message = cause instanceof Error ? cause.message : 'Could not load your habits.';
-        setLoaded({ token, refreshKey, habits: [], error: message });
-      });
+      getHabits(token)
+        .then((result) => {
+          if (!cancelled) setLoaded({ token, refreshKey, habits: todaysHabits(result), error: null });
+        })
+        .catch((cause: unknown) => {
+          if (cancelled) return;
+          const message = cause instanceof Error ? cause.message : 'Could not load your habits.';
+          setLoaded({ token, refreshKey, habits: [], error: message });
+        });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [token, refreshKey]);
+      return () => {
+        cancelled = true;
+      };
+    }, [token, refreshKey]),
+  );
 
   /** Creates a habit, then bumps `refreshKey` so the list (and streaks) reload. */
   const onCreateHabit = async (input: NewHabitInput) => {
@@ -188,10 +196,12 @@ export default function TodayScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
       edges={['top', 'left', 'right']}>
-      <View style={[styles.header, Platform.OS === 'web' && styles.headerWeb]}>
-        <ThemedText type="subtitle">Today</ThemedText>
-        <Button variant="outline" label="+ New Habit" onPress={() => setModalOpen(true)} />
-      </View>
+      <PageHeader
+        title="Today"
+        actions={
+          <Button variant="outline" label="+ New Habit" onPress={() => setModalOpen(true)} />
+        }
+      />
 
       <FlatList
         data={habits}
@@ -224,21 +234,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
-  },
-  header: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    // Title on the left, the "+ New Habit" action pinned to the right edge.
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  headerWeb: {
-    paddingTop: Spacing.six,
   },
   row: {
     flexDirection: 'row',

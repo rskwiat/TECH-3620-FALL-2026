@@ -39,7 +39,7 @@ export class ApiError extends Error {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'DELETE';
   body?: Record<string, unknown>;
   token?: string | null;
 };
@@ -178,4 +178,38 @@ export type NewHabitInput = {
 /** Creates a habit for the logged-in user → `201` + the created habit row. */
 export function createHabit(token: string, input: NewHabitInput): Promise<Habit> {
   return request<Habit>('/api/habits', { method: 'POST', body: input, token });
+}
+
+/** A completion log row as returned by `GET /api/habits/:id/logs`. */
+export type HabitLog = {
+  id: number;
+  habitId: number;
+  completedAt: string;
+  note: string | null;
+  createdAt: string;
+};
+
+/**
+ * Records one completion of a habit → `201` + the created log row. Defaults to
+ * "now"; multiple completions per day are allowed, which is how a habit's
+ * `timesPerPeriod` goal gets met.
+ */
+export function logHabitCompletion(
+  token: string,
+  habitId: number,
+  input?: { note?: string; completedAt?: string },
+): Promise<HabitLog> {
+  return request<HabitLog>(`/api/habits/${habitId}/logs`, {
+    method: 'POST',
+    body: input ?? {},
+    token,
+  });
+}
+
+/**
+ * Deletes a habit → `{ message }`. The habit's logs cascade-delete with it on
+ * the server, so this is permanent — worth a confirm before calling.
+ */
+export function deleteHabit(token: string, habitId: number): Promise<{ message: string }> {
+  return request<{ message: string }>(`/api/habits/${habitId}`, { method: 'DELETE', token });
 }
