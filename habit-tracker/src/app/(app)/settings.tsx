@@ -30,7 +30,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <PageTemplate title="Settings" subtitle="Your account and sign-in options.">
+    <PageTemplate title="Settings">
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedText type="smallBold" style={styles.cardTitle}>
           Your account
